@@ -54,10 +54,15 @@ trap(struct trapframe *tf)
         }
         pte_t* pte;
         pte=walkpgdir(myproc()->pgdir,rcr2(),0);
+	char* buffer[PGSIZE];
+	char* swapinbuf[PGSIZE];
         if(!(*pte)&PTE_PG){
             myproc()->pagenum++;
-        }
-	char* buffer[512];
+        }else{
+	   //store swap in content in buffer first
+	   uint swapinloc=(PTE_ADDR(*pte)>>12)&0xFFFF;
+           readFromSwapFile(myproc()->pgdir,swapinbuf,swapinloc,PGSIZE);
+	}
         if(myproc()->phy_pagenum<MAX_PSYC_PAGES){
             char * mem;
             mem = kalloc();
@@ -71,24 +76,27 @@ trap(struct trapframe *tf)
         }else(){
            //choose a victim to swap out
 	    pte* outpage=swapout();
-	    writeToSwapFile();
-	   //update out's loc
+	    writeToSwapFile(myproc()->pgdir,(char *)PTE_ADDR(*outpage),myproc()->swaploc,PGSIZE);
+	    *outpage=PTE_FLAG(*outpage)|(myproc()->swaploc<<12);
+	    myproc()->swaploc+=PGSIZE;
+	    
+	   //update flag
 	   *outpage&=~PTE_P;
 	   *outpage|=PTE_PG;
+
 	   uint a = PGROUNDDOWN(rcr2());
-           mappages(myproc()->pgdir, (char*) a, PGSIZE, PTR_ADDR(*outpage), PTE_W | PTE_U);
+           mappages(myproc()->pgdir, (char*) a, PGSIZE, PTE_ADDR(*outpage), PTE_W | PTE_U);
         }
 
         //check for swapin
         if(!(*pte)&PTE_PG){
 	//no need for swap in, clear contents
-            
+            memset((char *)PTE_ADDR(*pte),0,PGSIZE);
         }else{
 	//swap in contents
-            memset();
+           char * swapindest=(char *)PTE_ADDR(*pte);
+	   memcpy(swapindest,swapinbuf,PGSIZE);
         }
-
-
 
 
 

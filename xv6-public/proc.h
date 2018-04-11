@@ -57,7 +57,7 @@ struct proc {
   int pagenum; //vmpagenum
   int phy_pagenum;  //physical page number
   int swaploc;		//next swap position
-    
+  
 
 };
 
