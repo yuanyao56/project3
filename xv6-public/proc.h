@@ -1,3 +1,10 @@
+struct potentialVictims{
+        int previous;
+        int next;
+        int inStack;
+        pte_t* pte;
+};
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -57,7 +64,9 @@ struct proc {
   int pagenum; //vmpagenum
   int phy_pagenum;  //physical page number
   int swaploc;		//next swap position
-  
+  struct potentialVictims victims[15];
+  int head;
+  int tail;
 
 };
 
