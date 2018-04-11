@@ -160,9 +160,39 @@ trap(struct trapframe *tf)
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
-     tf->trapno == T_IRQ0+IRQ_TIMER)
-    yield();
-
+     tf->trapno == T_IRQ0+IRQ_TIMER){
+	/*int i;
+	pte_t* pte1;
+	for(i=0;i<p->sz;i+=PGSIZE){
+		pte1 = walkpgdir(myproc()->pgdir, (char *)i, 0);
+		if(*pte1 & PTE_A){
+			int j = 0;
+			for(j=0; j<15; j++){
+				if(PTE_ADDR(*myproc()->victims[j].pte)==PTE_ADDR(*pte1) && myproc()->victims[j].inStack>0){
+					if (myproc()->head! = j && myproc()->tail != j){
+						myproc()->victims[myproc()->victims[j].previous].next = myproc()->victims[j].next;
+                                        	myproc()->victims[myproc()->victims[j].next].previous = myproc()->victims[j].previous;
+                                        	myproc()->victims[j].previous = -1;
+                                        	myproc()->victims[j].next = myproc()->head;
+                                        	myproc()->victims[myproc()->head].previous = j;
+                                        	myproc()->head = j;
+					}
+					if (myproc()->head != j && myproc()->tail == j){
+                                        	myproc()->tail = myproc()->victims[j].previous;
+                                        	myproc()->victims[myproc()->tail].next = -1;
+                                        	myproc()->victims[j].next = myproc()->head;
+                                        	myproc()->victims[j].previous = -1;
+                                        	myproc()->victims[myproc()->head].previous = j;
+                                        	myproc()->head = j;
+                                	}
+					break;
+				}
+			}
+		}
+		*pte1 &= ~PTE_A;
+	}	*/		
+    	yield();
+  }
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
@@ -191,4 +221,8 @@ pte_t* swapout(){
        }   
        return ptes[rand()%total];
 	//#endif	
+	
+	#ifdef LRU
+        return myproc()->victims[myproc()->tail];
+        #endif
 }
