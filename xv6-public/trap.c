@@ -7,7 +7,6 @@
 #include "x86.h"
 #include "traps.h"
 #include "spinlock.h"
-#include "trap.h"
 
 // Interrupt descriptor table (shared by all CPUs).
 int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
