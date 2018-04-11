@@ -205,6 +205,13 @@ fork(void)
   np->phy_pagenum=0;
   np->swaploc=0;
   createSwapFile(np);
+  char* buffer[512];
+  uint loc=0;
+  while(readFromSwapFile(curproc,buffer,loc,PGSIZE)){
+       writewriteToSwapFile(np,buffer,loc,PGSIZE);
+       loc+=PGSIZE;
+  }
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
