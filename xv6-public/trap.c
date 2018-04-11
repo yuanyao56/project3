@@ -33,6 +33,8 @@ idtinit(void)
   lidt(idt, sizeof(idt));
 }
 
+pte_t* swapout(void);
+
 //PAGEBREAK: 41
 void
 trap(struct trapframe *tf)
@@ -47,20 +49,20 @@ trap(struct trapframe *tf)
     return;
   }
   if(tf->trapno == T_PGFLT) {
+	uint va=rcr2();
        if(myproc()->pagenum>=MAX_TOTAL_PAGES){
 	   kill(myproc()->pid);
 	   return ;
         }
         pte_t* pte;
-        pte=walkpgdir(myproc()->pgdir,rcr2(),0);
-	char* buffer[PGSIZE];
-	char* swapinbuf[PGSIZE];
-        if(!(*pte)&PTE_PG){
+        pte=walkpgdir(myproc()->pgdir,(void *)va,0);
+	char swapinbuf[PGSIZE];
+        if(!((*pte)&PTE_PG)){
             myproc()->pagenum++;
         }else{
 	   //store swap in content in buffer first
 	   uint swapinloc=(PTE_ADDR(*pte)>>12)&0xFFFF;
-           readFromSwapFile(myproc()->pgdir,swapinbuf,swapinloc,PGSIZE);
+           readFromSwapFile(myproc(),swapinbuf,swapinloc,PGSIZE);
 	}
         if(myproc()->phy_pagenum<MAX_PSYC_PAGES){
             char * mem;
@@ -70,31 +72,31 @@ trap(struct trapframe *tf)
               return ;
             }
             memset(mem, 0, PGSIZE);
-            uint a = PGROUNDDOWN(rcr2());
+            uint a = PGROUNDDOWN(va);
             mappages(myproc()->pgdir, (char*) a, PGSIZE, V2P(mem), PTE_W | PTE_U);
-        }else(){
+        }else{
            //choose a victim to swap out
-	    pte* outpage=swapout();
-	    writeToSwapFile(myproc()->pgdir,(char *)PTE_ADDR(*outpage),myproc()->swaploc,PGSIZE);
-	    *outpage=PTE_FLAG(*outpage)|(myproc()->swaploc<<12);
+	    pte_t* outpage=swapout();
+	    writeToSwapFile(myproc(),(char *)PTE_ADDR(*outpage),myproc()->swaploc,PGSIZE);
+	    *outpage=PTE_FLAGS(*outpage)|(myproc()->swaploc<<12);
 	    myproc()->swaploc+=PGSIZE;
 	    
 	   //update flag
 	   *outpage&=~PTE_P;
 	   *outpage|=PTE_PG;
 
-	   uint a = PGROUNDDOWN(rcr2());
+	   uint a = PGROUNDDOWN(va);
            mappages(myproc()->pgdir, (char*) a, PGSIZE, PTE_ADDR(*outpage), PTE_W | PTE_U);
         }
 
         //check for swapin
-        if(!(*pte)&PTE_PG){
+        if(!((*pte)&PTE_PG)){
 	//no need for swap in, clear contents
             memset((char *)PTE_ADDR(*pte),0,PGSIZE);
         }else{
 	//swap in contents
            char * swapindest=(char *)PTE_ADDR(*pte);
-	   memcpy(swapindest,swapinbuf,PGSIZE);
+	   memmove(swapindest,swapinbuf,PGSIZE);
         }
 
 
@@ -165,7 +167,28 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
 }
+unsigned long randstate = 1;
+unsigned int
+rand()
+{
+  randstate = randstate * 1664525 + 1013904223;
+  return randstate;
+}
+
 
 pte_t* swapout(){
-	
+	//#ifdef RAND
+	struct proc* p = myproc();
+        pte_t *pte;
+        pte_t *ptes[15];
+        int i,j=0,total=0;
+        for(i=0; i<p->sz; i+=PGSIZE){
+        	pte = walkpgdir(p->pgdir, (char *)i, 0);
+        	if(*pte & PTE_P){ //check PTE_P
+            		total++;
+            		ptes[j++]=pte;
+        	}
+       }   
+       return ptes[rand()%total];
+	//#endif	
 }

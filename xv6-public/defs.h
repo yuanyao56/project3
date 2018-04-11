@@ -1,3 +1,4 @@
+typedef uint pte_t;
 struct buf;
 struct context;
 struct file;

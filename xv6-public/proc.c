@@ -205,10 +205,10 @@ fork(void)
   np->phy_pagenum=0;
   np->swaploc=0;
   createSwapFile(np);
-  char* buffer[4096];
+  char buffer[4096];
   uint loc=0;
   while(readFromSwapFile(curproc,buffer,loc,PGSIZE)){
-       writewriteToSwapFile(np,buffer,loc,PGSIZE);
+       writeToSwapFile(np,buffer,loc,PGSIZE);
        loc+=PGSIZE;
   }
 
