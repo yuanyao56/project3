@@ -7,6 +7,7 @@
 #include "x86.h"
 #include "traps.h"
 #include "spinlock.h"
+#include "trap.h"
 
 // Interrupt descriptor table (shared by all CPUs).
 int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
@@ -56,7 +57,7 @@ trap(struct trapframe *tf)
         if(!(*pte)&PTE_PG){
             myproc()->pagenum++;
         }
-
+	char* buffer[512];
         if(myproc()->phy_pagenum<MAX_PSYC_PAGES){
             char * mem;
             mem = kalloc();
@@ -69,7 +70,13 @@ trap(struct trapframe *tf)
             mappages(myproc()->pgdir, (char*) a, PGSIZE, V2P(mem), PTE_W | PTE_U);
         }else(){
            //choose a victim to swap out
-
+	    pte* outpage=swapout();
+	    writeToSwapFile();
+	   //update out's loc
+	   *outpage&=~PTE_P;
+	   *outpage|=PTE_PG;
+	   uint a = PGROUNDDOWN(rcr2());
+           mappages(myproc()->pgdir, (char*) a, PGSIZE, PTR_ADDR(*outpage), PTE_W | PTE_U);
         }
 
         //check for swapin
@@ -150,4 +157,8 @@ trap(struct trapframe *tf)
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
+}
+
+pte_t* swapout(){
+	
 }
