@@ -168,7 +168,7 @@ trap(struct trapframe *tf)
 		if(*pte1 & PTE_A){
 			int j = 0;
 			for(j=0; j<15; j++){
-				if(PTE_ADDR(*myproc()->victims[j].pte)==PTE_ADDR(*pte1) && myproc()->victims[j].inStack>0){
+				if(PTE_ADDR(*myproc()->victims[j].pte)==PTE_ADDR(*pte1) && myproc()->victims[j].inStack==1){
 					if (myproc()->head! = j && myproc()->tail != j){
 						myproc()->victims[myproc()->victims[j].previous].next = myproc()->victims[j].next;
                                         	myproc()->victims[myproc()->victims[j].next].previous = myproc()->victims[j].previous;
@@ -223,6 +223,46 @@ pte_t* swapout(){
 	//#endif	
 	
 	#ifdef LRU
-        return myproc()->victims[myproc()->tail];
+        pte_t* ret = myproc()->victims[myproc()->tail].pte;
+	myproc()->victims[myproc()->tail].inStack = 0;
+	myproc()->victims[myproc()->victims[myproc()->tail].previous].next = -1;
+	myproc()->tail = myproc()->victims[myproc()->tail].previous;
         #endif
+}
+
+int allocateStack(pte_t* pte1){
+	int i;
+	int b=0;
+	for(i=0; i<15; i++){
+		if(myproc()->victims[i].inStack!=1)
+			b++;
+	}
+	if (b==0){
+		return -1;
+	}
+	else if(b==15){
+		myproc()->head = 0;
+		myproc()->tail = 0;
+		myproc()->victims[0].previous = -1;
+		myproc()->victims[0].next = -1;
+		myproc()->victims[0].inStack = 1;
+		myproc()->victims[0].pte = pte1;
+		return 1;
+	}
+	
+	else{
+		for(i=0; i<15; i++){
+			if(myproc()->victims[i].inStack!=1){
+				myproc()->victims[i].inStack = 1;
+				myproc()->victims[i].pte = pte1;
+				myproc()->victims[i].previous = -1;
+				myproc()->victims[i].next = myproc()->head;
+				myproc()->victims[myproc()->head].previous = i;
+				myproc()->head = i;
+				return 2;
+			}
+		}
+	}
+	
+	return -2;
 }
