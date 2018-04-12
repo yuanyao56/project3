@@ -161,7 +161,8 @@ trap(struct trapframe *tf)
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER){
-	/*int i;
+	#ifdef LRU
+	int i;
 	pte_t* pte1;
 	for(i=0;i<p->sz;i+=PGSIZE){
 		pte1 = walkpgdir(myproc()->pgdir, (char *)i, 0);
@@ -190,7 +191,8 @@ trap(struct trapframe *tf)
 			}
 		}
 		*pte1 &= ~PTE_A;
-	}	*/		
+	}
+	#endif
     	yield();
   }
   // Check if the process has been killed since we yielded
@@ -225,12 +227,29 @@ pte_t* swapout(){
 	#ifdef LRU
         pte_t* ret = myproc()->victims[myproc()->tail].pte;
 	myproc()->victims[myproc()->tail].inStack = 0;
+	if(myproc()->victims[myproc()->tail].previous < 0)
+		return ret;
 	myproc()->victims[myproc()->victims[myproc()->tail].previous].next = -1;
 	myproc()->tail = myproc()->victims[myproc()->tail].previous;
+	return ret;
         #endif
+	
+	
+	#ifdef FIFO
+	pte_t* ret = myproc()->victims[myproc()->head].pte;
+	myproc()->victims[myproc()->head].inStack = 0;
+	if(myproc()->victims[myproc()->head].next < 0)
+		return ret;
+	myproc()->victims[myproc()->victims[myproc()->head].next].previous = -1;
+	myproc()->head = myproc()->victims[myproc()->head].next;
+	return ret;
+	#endif
+	
+	
 }
 
 int allocateStack(pte_t* pte1){
+	#ifdef LRU
 	int i;
 	int b=0;
 	for(i=0; i<15; i++){
@@ -249,7 +268,6 @@ int allocateStack(pte_t* pte1){
 		myproc()->victims[0].pte = pte1;
 		return 1;
 	}
-	
 	else{
 		for(i=0; i<15; i++){
 			if(myproc()->victims[i].inStack!=1){
@@ -263,6 +281,44 @@ int allocateStack(pte_t* pte1){
 			}
 		}
 	}
-	
 	return -2;
+	#endif
+	
+	
+	#ifdef FIFO
+	int i;
+	int b=0;
+	for(i=0; i<15; i++){
+		if(myproc()->victims[i].inStack!=1)
+			b++;
+	}
+	
+	if (b==0){
+		return -1;
+	}
+	
+	else if(b==15){
+		myproc()->head = 0;
+		myproc()->tail = 0;
+		myproc()->victims[0].previous = -1;
+		myproc()->victims[0].next = -1;
+		myproc()->victims[0].inStack = 1;
+		myproc()->victims[0].pte = pte1;
+		return 1;
+	}
+	else{
+		for(i=0; i<15; i++){
+			if(myproc()->victims[i].inStack!=1){
+				myproc()->victims[i].inStack = 1;
+				myproc()->victims[i].pte = pte1;
+				myproc()->victims[i].next = -1;
+				myproc()->victims[i].previous = myproc()->tail;
+				myproc()->victims[myproc()->tail].next = i;
+				myproc()->tail = i;
+				return 2;
+			}
+		}
+	}	
+	return -2;
+	#endif
 }
